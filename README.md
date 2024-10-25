@@ -27,6 +27,9 @@ UserConfigDir location defined by Go
 On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config. On Darwin, it returns $HOME/Library/Application Support. On Windows, it returns %AppData%. On Plan 9, it returns $home/lib.
 ```
 
+Logs are outputed to /tmp/immich-sync.out.log and /tmp/immich-sync.err.log capturing file changes and uploads. 
+
+
 ### Command Line Arguments
  - --service: Control the system service [start, stop, restart, install, uninstall]
  - --server: URL For immich server to make api calls
