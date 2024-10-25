@@ -27,7 +27,7 @@ On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specificati
 ```
 
 ### Command Line Arguments
- --service: Control the system service [start, stop, restart, install, uninstall]
- --server: URL For immich server to make api calls
- --path: Add path to folder to sync, stack with multiple calls for multiple paths
- --key: API Key to server
+ - --service: Control the system service [start, stop, restart, install, uninstall]
+ - --server: URL For immich server to make api calls
+ - --path: Add path to folder to sync, stack with multiple calls for multiple paths
+ - --key: API Key to server
