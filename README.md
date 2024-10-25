@@ -1,4 +1,5 @@
 # immich-sync
+`Work in progress, any feedback is appreciated. Has not been tested on a range of systems, and is subject to significat change.`
 
 A background service to sync images from a computer to an Immich server. Similar to the sync provided by the Immich App, immich-sync will watch for any changes in provided folders and upload them to your specified immich instance. 
 
