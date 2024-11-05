@@ -87,11 +87,19 @@ func isExtensionSupported(supportedTypes []string, ext string) bool {
 	return false
 }
 
-func (p *program) run() error {
-	logger.Infof("I'm running %v.", service.Platform())
-	immichClient := client.NewImmichClient()
+func startUp() (client.ImmichClient, client.SupportedMediaTypesResponse, error) {
+	immichClient, err := client.NewImmichClient(logger)
 
 	mediaTypes, err := immichClient.GetSupportedMediaTypes()
+	if err != nil {
+		logger.Error(err)
+	}
+	return immichClient, mediaTypes, nil
+}
+
+func (p *program) run() error {
+	logger.Infof("I'm running %v.", service.Platform())
+	immichClient, mediaTypes, err := startUp()
 	if err != nil {
 		logger.Error(err)
 	}
@@ -104,6 +112,9 @@ func (p *program) run() error {
 
 	// Start listening for events.
 	go func() {
+		fileBuf := make([]string, 0)
+		connected := true
+		updateConnected := make(chan bool)
 		for {
 			select {
 			case event, ok := <-watcher.Events:
@@ -116,8 +127,41 @@ func (p *program) run() error {
 					ext := strings.ToLower(filepath.Ext(event.Name))
 
 					if isExtensionSupported(mediaTypes.Image, ext) {
-						immichClient.UploadImage(event.Name)
+						if !connected {
+							fileBuf = append(fileBuf, event.Name)
+						}
+						res, err := immichClient.UploadImage(event.Name)
+						// Check for HTTP error
+						if err != nil {
+							logger.Error(err)
+							err := immichClient.CheckConnectivty()
+							if err != nil {
+								// Set value in immich client that will trigger intermittent checks for restablishing connectivity
+								// Until then push to buffer
+								logger.Info("Connectivity lost, storing to buffer and retrying")
+								connected = false
+								fileBuf = append(fileBuf, event.Name)
+								go immichClient.WaitForConnectivity(updateConnected)
+							}
+						}
+						logger.Info(string(res))
 					}
+				}
+			case update, ok := <-updateConnected:
+				logger.Info("Connectivity update")
+				if !ok {
+					return
+				}
+				if update == true {
+					connected = true
+					//capture and handle errors for bulk upload
+					logger.Info("Connectivity restablished, uploading buffer")
+					err := immichClient.BulkUpload(fileBuf)
+					//Manage this error situation better
+					if err != nil {
+						logger.Error(err)
+					}
+					fileBuf = []string{}
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -148,6 +192,7 @@ func (p *program) run() error {
 
 			if d.IsDir() {
 				err := watcher.Add(path)
+				logger.Info(path)
 				if err != nil {
 					logger.Error(err)
 					return err
@@ -158,9 +203,9 @@ func (p *program) run() error {
 
 			return nil
 		})
-
 	}
 
+	logger.Info("Syncing existing images in path")
 	checkData, err := immichClient.GetNewFiles(shaMap)
 	if err != nil {
 		logger.Info(err)
@@ -170,10 +215,15 @@ func (p *program) run() error {
 
 	for _, image := range checkData.Results {
 		if image.Action == "accept" {
-			immichClient.UploadImage(image.ID)
-			//logger.Info(image.ID)
+			res, err := immichClient.UploadImage(image.ID)
+			if err != nil {
+				logger.Error(err)
+			}
+			logger.Info(string(res))
 		}
 	}
+
+	logger.Info("Finished syncing existing images in path")
 
 	// Block main goroutine forever.
 	<-make(chan struct{})
@@ -260,17 +310,17 @@ func main() {
 	}
 
 	configDir, _ := os.UserConfigDir()
-	if !fileExists(configDir + "/immich-backup/config.yaml") {
+	if !fileExists(configDir + "/immich-sync/config.yaml") {
 		if err != nil {
 			logger.Info(err)
 		}
-		err = os.Mkdir(configDir+"/immich-backup", 0755)
+		err = os.Mkdir(configDir+"/immich-sync", 0755)
 		if err != nil {
 			logger.Info(err)
 		}
-		os.Create(configDir + "/immich-backup/config.yaml")
+		os.Create(configDir + "/immich-sync/config.yaml")
 	}
-	viper.AddConfigPath(configDir + "/immich-backup")
+	viper.AddConfigPath(configDir + "/immich-sync")
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 
@@ -296,7 +346,7 @@ func main() {
 		return
 	}
 
-	err = viper.WriteConfigAs(configDir + "/immich-backup/config.yaml")
+	err = viper.WriteConfigAs(configDir + "/immich-sync/config.yaml")
 	if err != nil {
 		logger.Info(err)
 	}
