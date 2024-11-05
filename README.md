@@ -1,5 +1,5 @@
 # immich-sync
-`Work in progress, any feedback is appreciated. Has not been tested on a range of systems, and is subject to significat change.`
+`Work in progress, any feedback is appreciated. Has not been tested on a range of systems, and is subject to significant change.`
 
 A background service to sync images from a computer to an Immich server. Similar to the sync provided by the Immich App, immich-sync will watch for any changes in provided folders and upload them to your specified immich instance. 
 
@@ -20,15 +20,17 @@ When first running the service configure the server URL, API Key, and the paths 
 ./immich-sync --service start
 ```
 
-Editing the configuration file can be done by running it again with the updated command line variables or by directly editing the config yaml file located at `$UserConfigDir`/immich-sync/config.yaml. After udpating the configuration the service needs to be restarted.
+Editing the configuration file can be done by running it again with the updated command line variables or by directly editing the config yaml file located at `$UserConfigDir`/immich-sync/config.yaml. After updating the configuration the service needs to be restarted.
 
 UserConfigDir location defined by Go
 ```
 On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config. On Darwin, it returns $HOME/Library/Application Support. On Windows, it returns %AppData%. On Plan 9, it returns $home/lib.
 ```
 
-Logs are outputed to /tmp/immich-sync.out.log and /tmp/immich-sync.err.log capturing file changes and uploads. 
+Logs are outputted to /tmp/immich-sync.out.log and /tmp/immich-sync.err.log capturing file changes and uploads. 
 
+#### Recovering from network disruptions
+During connectivity loss to the Immich server updated files are stored in a buffer which is then synced when connectivity is re-established.
 
 ### Command Line Arguments
  - --service: Control the system service [start, stop, restart, install, uninstall]
