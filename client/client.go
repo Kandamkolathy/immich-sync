@@ -40,9 +40,10 @@ type SupportedMediaTypesResponse struct {
 }
 
 type ImmichClient struct {
-	client http.Client
-	server string
-	logger service.Logger
+	client     http.Client
+	server     string
+	Logger     service.Logger
+	MediaTypes SupportedMediaTypesResponse
 }
 
 var backoff []time.Duration = []time.Duration{500 * time.Millisecond, 5 * time.Second, 1 * time.Minute}
@@ -51,12 +52,14 @@ func NewImmichClient(logger service.Logger) (ImmichClient, error) {
 	client := ImmichClient{
 		client: http.Client{},
 		server: viper.GetString("server"),
-		logger: logger,
+		Logger: logger,
 	}
 
 	err := client.CheckConnectivty()
 
 	if err == nil {
+		mediaTypes, _ := client.GetSupportedMediaTypes()
+		client.MediaTypes = mediaTypes
 		return client, nil
 	}
 
@@ -68,6 +71,8 @@ func NewImmichClient(logger service.Logger) (ImmichClient, error) {
 		case <-ticker.C:
 			err := client.CheckConnectivty()
 			if err == nil {
+				mediaTypes, _ := client.GetSupportedMediaTypes()
+				client.MediaTypes = mediaTypes
 				return client, nil
 			}
 			logger.Error("Server connectivty failed, retrying")
@@ -77,13 +82,14 @@ func NewImmichClient(logger service.Logger) (ImmichClient, error) {
 			}
 		}
 	}
+
 }
 
 func (i *ImmichClient) CheckConnectivty() error {
 	url := i.server + "/api/server/ping"
 	method := "GET"
 
-	i.logger.Info("Checking connectivity")
+	i.Logger.Info("Checking connectivity")
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return err
@@ -105,7 +111,7 @@ func (i *ImmichClient) CheckConnectivty() error {
 	}
 	fmt.Println(string(body))
 
-	i.logger.Info("Connectivity exists")
+	i.Logger.Info("Connectivity exists")
 	return nil
 }
 
@@ -118,10 +124,10 @@ func (i *ImmichClient) WaitForConnectivity(connectedStatus chan<- bool) {
 			err := i.CheckConnectivty()
 			if err == nil {
 				connectedStatus <- true
-				i.logger.Info("Connectivty established")
+				i.Logger.Info("Connectivty established")
 				return
 			}
-			i.logger.Info("Connectivty failed, trying again...")
+			i.Logger.Info("Connectivty failed, trying again...")
 			if backoffIdx < len(backoff)-1 {
 				backoffIdx += 1
 				ticker.Reset(backoff[backoffIdx])
@@ -204,7 +210,7 @@ func (i *ImmichClient) UploadImage(path string) ([]byte, error) {
 }
 
 func (i *ImmichClient) BulkUpload(buffer []string) error {
-	i.logger.Info("Uploading buffer")
+	i.Logger.Info("Uploading buffer")
 	for _, file := range buffer {
 		res, err := i.UploadImage(file)
 		// Check for HTTP error
@@ -215,7 +221,7 @@ func (i *ImmichClient) BulkUpload(buffer []string) error {
 			}
 			return err
 		}
-		i.logger.Info(string(res))
+		i.Logger.Info(string(res))
 		// Log uploaded files
 	}
 	return nil
@@ -269,7 +275,10 @@ func (i *ImmichClient) GetSupportedMediaTypes() (SupportedMediaTypesResponse, er
 	url := i.server + "/api/server/media-types"
 	method := "GET"
 
-	data := SupportedMediaTypesResponse{}
+	var data SupportedMediaTypesResponse
+
+	defaultMediaTypes := "{\"video\":[\".3gp\",\".3gpp\",\".avi\",\".flv\",\".insv\",\".m2ts\",\".m4v\",\".mkv\",\".mov\",\".mp4\",\".mpe\",\".mpeg\",\".mpg\",\".mts\",\".webm\",\".wmv\"],\"image\":[\".3fr\",\".ari\",\".arw\",\".cap\",\".cin\",\".cr2\",\".cr3\",\".crw\",\".dcr\",\".dng\",\".erf\",\".fff\",\".iiq\",\".k25\",\".kdc\",\".mrw\",\".nef\",\".nrw\",\".orf\",\".ori\",\".pef\",\".psd\",\".raf\",\".raw\",\".rw2\",\".rwl\",\".sr2\",\".srf\",\".srw\",\".x3f\",\".avif\",\".bmp\",\".gif\",\".heic\",\".heif\",\".hif\",\".insp\",\".jpe\",\".jpeg\",\".jpg\",\".jxl\",\".png\",\".svg\",\".tif\",\".tiff\",\".webp\"],\"sidecar\":[\".xmp\"]}"
+	json.Unmarshal([]byte(defaultMediaTypes), &data)
 
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
@@ -294,4 +303,16 @@ func (i *ImmichClient) GetSupportedMediaTypes() (SupportedMediaTypesResponse, er
 	}
 
 	return data, nil
+}
+
+func (i *ImmichClient) IsExtensionSupported(ext string) bool {
+	normalisedExt := strings.ToLower(ext)
+
+	for _, t := range i.MediaTypes.Image {
+		if t == normalisedExt {
+			return true
+		}
+	}
+
+	return false
 }

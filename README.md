@@ -23,9 +23,12 @@ When first running the service configure the server URL, API Key, and the paths 
 Editing the configuration file can be done by running it again with the updated command line variables or by directly editing the config yaml file located at `$UserConfigDir`/immich-sync/config.yaml. After updating the configuration the service needs to be restarted.
 
 UserConfigDir location defined by Go
-```
-On Unix systems, it returns $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html if non-empty, else $HOME/.config. On Darwin, it returns $HOME/Library/Application Support. On Windows, it returns %AppData%. On Plan 9, it returns $home/lib.
-```
+- MacOS: $HOME/Library/Application Support
+- Windows: %AppData%
+- Unix: $XDG_CONFIG_HOME as specified by https://specifications.freedesktop.org/basedir-spec/basedir-spec-latest.html
+
+
+
 
 Logs are outputted to /tmp/immich-sync.out.log and /tmp/immich-sync.err.log capturing file changes and uploads. 
 
